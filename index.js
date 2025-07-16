@@ -1,3 +1,38 @@
+const puppeteer = require('puppeteer-core');
+const fs = require('fs').promises;
+const chrome = require('chrome-aws-lambda'); // Добавьте эту строку
+
+const waitTillHTMLRendered = async (page, timeout = 20000) => {
+  // Ваш код waitTillHTMLRendered без изменений
+  const checkDurationMsecs = 500;
+  const maxChecks = timeout / checkDurationMsecs;
+  let lastHTMLSize = 0;
+  let checkCounts = 1;
+  let countStableSizeIterations = 0;
+  const minStableSizeIterations = 2;
+
+  while (checkCounts++ <= maxChecks) {
+    let html = await page.content();
+    let currentHTMLSize = html.length;
+    let bodyHTMLSize = await page.evaluate(() => document.body.innerHTML.length);
+
+    console.log('last: ', lastHTMLSize, ' <> curr: ', currentHTMLSize, ' body html size: ', bodyHTMLSize);
+
+    if (lastHTMLSize != 0 && currentHTMLSize == lastHTMLSize)
+      countStableSizeIterations++;
+    else
+      countStableSizeIterations = 0;
+
+    if (countStableSizeIterations >= minStableSizeIterations) {
+      console.log('Page rendered fully..');
+      break;
+    }
+
+    lastHTMLSize = currentHTMLSize;
+    await new Promise(resolve => setTimeout(resolve, checkDurationMsecs));
+  }
+};
+
 async function run(searchQuery, pageStart, pageEnd, question) {
   const browser = await chrome.puppeteer.launch({
     args: chrome.args,
@@ -5,7 +40,7 @@ async function run(searchQuery, pageStart, pageEnd, question) {
     headless: chrome.headless
   });
   const page = await browser.newPage();
-
+  // Остальной код run без изменений
   await page.goto('https://www.wildberries.ru/security/login', { waitUntil: 'networkidle2', timeout: 30000 });
   await waitTillHTMLRendered(page);
   console.log('Ожидание входа в аккаунт...');
