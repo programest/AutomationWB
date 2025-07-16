@@ -33,10 +33,15 @@ const waitTillHTMLRendered = async (page, timeout = 20000) => {
 };
 
 async function run(searchQuery, pageStart, pageEnd, question) {
-  const browser = await chrome.puppeteer.launch({
+  const executablePath = await chrome.executablePath;
+  if (!executablePath) {
+    throw new Error('Не удалось найти исполняемый файл Chrome от chrome-aws-lambda');
+  }
+
+  const browser = await puppeteer.launch({
     args: chrome.args,
     defaultViewport: chrome.defaultViewport,
-    executablePath: await chrome.executablePath,
+    executablePath,
     headless: chrome.headless,
     ignoreHTTPSErrors: true
   });
