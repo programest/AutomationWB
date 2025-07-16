@@ -73,34 +73,48 @@
 
   <script>
   async function runScript() {
-  const response = await fetch('/run-script', { method: 'POST' });
-  if (response.ok) {
-    loadResults();
-  } else {
-    alert('Ошибка при запуске скрипта!');
-  }
-}
+    const searchQuery = prompt('Что будем искать?');
+    const pageStart = parseInt(prompt('С какой страницы начать парсинг? (например, 1)')) || 1;
+    const pageEnd = parseInt(prompt('По какую страницу парсить? (например, 5)')) || Infinity;
+    const question = prompt('Какой вопрос задать для всех карточек?', 'Подскажите, а можно использовать карты 128 gb?');
 
-    async function loadResults() {
-      try {
-        const response = await fetch('results.json');
-        const data = await response.json();
-        document.getElementById('processed').textContent = `Обработано карточек: ${data.processedCards}`;
-        document.getElementById('timestamp').textContent = `Время выполнения: ${new Date(data.timestamp).toLocaleString()}`;
-        const titlesList = document.getElementById('titles');
-        titlesList.innerHTML = '';
-        data.productTitles.forEach(title => {
-          const li = document.createElement('li');
-          li.textContent = title;
-          titlesList.appendChild(li);
-        });
-      } catch (error) {
-        console.error('Ошибка загрузки результатов:', error);
-      }
+    if (!searchQuery || !question) {
+      alert('Поисковый запрос или вопрос не введены!');
+      return;
     }
 
-    // Загрузка результатов при открытии страницы
-    loadResults();
-  </script>
+    const response = await fetch('/run-script', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ searchQuery, pageStart, pageEnd, question })
+    });
+
+    if (response.ok) {
+      loadResults();
+    } else {
+      alert('Ошибка при запуске скрипта!');
+    }
+  }
+
+  async function loadResults() {
+    try {
+      const response = await fetch('/results.json');
+      const data = await response.json();
+      document.getElementById('processed').textContent = `Обработано карточек: ${data.processedCards}`;
+      document.getElementById('timestamp').textContent = `Время выполнения: ${new Date(data.timestamp).toLocaleString()}`;
+      const titlesList = document.getElementById('titles');
+      titlesList.innerHTML = '';
+      data.productTitles.forEach(title => {
+        const li = document.createElement('li');
+        li.textContent = title;
+        titlesList.appendChild(li);
+      });
+    } catch (error) {
+      console.error('Ошибка загрузки результатов:', error);
+    }
+  }
+
+  loadResults();
+</script>
 </body>
 </html>
