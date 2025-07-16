@@ -1,38 +1,4 @@
-const puppeteer = require('puppeteer-core');
-const fs = require('fs').promises;
-const chrome = require('chrome-aws-lambda');
-
-const waitTillHTMLRendered = async (page, timeout = 20000) => {
-  const checkDurationMsecs = 500;
-  const maxChecks = timeout / checkDurationMsecs;
-  let lastHTMLSize = 0;
-  let checkCounts = 1;
-  let countStableSizeIterations = 0;
-  const minStableSizeIterations = 2;
-
-  while (checkCounts++ <= maxChecks) {
-    let html = await page.content();
-    let currentHTMLSize = html.length;
-    let bodyHTMLSize = await page.evaluate(() => document.body.innerHTML.length);
-
-    console.log('last: ', lastHTMLSize, ' <> curr: ', currentHTMLSize, ' body html size: ', bodyHTMLSize);
-
-    if (lastHTMLSize != 0 && currentHTMLSize == lastHTMLSize)
-      countStableSizeIterations++;
-    else
-      countStableSizeIterations = 0;
-
-    if (countStableSizeIterations >= minStableSizeIterations) {
-      console.log('Page rendered fully..');
-      break;
-    }
-
-    lastHTMLSize = currentHTMLSize;
-    await new Promise(resolve => setTimeout(resolve, checkDurationMsecs));
-  }
-};
-
-async function run() {
+async function run(searchQuery, pageStart, pageEnd, question) {
   const browser = await chrome.puppeteer.launch({
     args: chrome.args,
     executablePath: await chrome.executablePath,
@@ -40,7 +6,6 @@ async function run() {
   });
   const page = await browser.newPage();
 
-  // Ожидание входа в аккаунт
   await page.goto('https://www.wildberries.ru/security/login', { waitUntil: 'networkidle2', timeout: 30000 });
   await waitTillHTMLRendered(page);
   console.log('Ожидание входа в аккаунт...');
@@ -48,21 +13,8 @@ async function run() {
   await page.waitForSelector('a.navbar-pc__link.j-wba-header-item[data-wba-header-name="DLV"]', { timeout: 0, visible: true });
   await waitTillHTMLRendered(page);
 
-  // Основной цикл скрипта
-  const searchQuery = await page.evaluate(() => prompt('Что будем искать?'));
-  if (!searchQuery) {
-    console.log('Поисковый запрос не введен.');
-    await browser.close();
-    return;
-  }
-  const pageRange = await page.evaluate(() => {
-    const start = prompt('С какой страницы начать парсинг? (например, 1)');
-    const end = prompt('По какую страницу парсить? (например, 5)');
-    return { start: parseInt(start) || 1, end: parseInt(end) || Infinity };
-  });
-  const question = await page.evaluate(() => prompt('Какой вопрос задать для всех карточек?', 'Подскажите, а можно использовать карты 128 gb?'));
-  if (!question) {
-    console.log('Вопрос не введен.');
+  if (!searchQuery || !question) {
+    console.log('Отсутствует поисковый запрос или вопрос.');
     await browser.close();
     return;
   }
@@ -79,9 +31,9 @@ async function run() {
 
   let allCards = [];
   let productTitles = [];
-  let pageNum = pageRange.start;
+  let pageNum = pageStart || 1;
 
-  while (pageNum <= pageRange.end) {
+  while (pageNum <= (pageEnd || Infinity)) {
     await page.evaluate(async () => {
       for (let i = 0; i < 5; i++) {
         window.scrollBy(0, window.innerHeight);
@@ -99,7 +51,7 @@ async function run() {
     allCards = allCards.concat(cards);
 
     const nextPage = await page.$('.pagination__wrapper .pagination-item.j-page');
-    if (!nextPage || pageNum >= pageRange.end) break;
+    if (!nextPage || pageNum >= (pageEnd || Infinity)) break;
 
     const totalPages = await page.$$eval('.pagination-item.j-page', els => els.length);
     if (pageNum >= totalPages) break;
@@ -149,7 +101,6 @@ async function run() {
   };
   await fs.writeFile('results.json', JSON.stringify(results, null, 2));
   console.log('Собранные названия товаров:', productTitles);
-  await page.evaluate(titles => alert(`Скрипт завершен! Обработано карточек: ${titles.length}\nСобранные названия:\n${titles.join('\n')}\nНажмите OK, чтобы начать заново.`), productTitles);
 
   await browser.close();
 }
