@@ -35,9 +35,10 @@ const waitTillHTMLRendered = async (page, timeout = 20000) => {
 async function run(searchQuery, pageStart, pageEnd, question) {
   const browser = await chrome.puppeteer.launch({
     args: chrome.args,
+    defaultViewport: chrome.defaultViewport,
     executablePath: await chrome.executablePath,
     headless: chrome.headless,
-    defaultViewport: chrome.defaultViewport // Добавьте это для стабильности
+    ignoreHTTPSErrors: true
   });
   const page = await browser.newPage();
 
